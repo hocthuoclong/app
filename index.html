@@ -181,10 +181,10 @@
             </a>
         </div>
 
-        <!-- Poem Display Area -->
-        <div id="poem-display" class="mt-8 p-6 bg-gray-700 rounded-xl shadow-lg hidden aspect-video flex flex-col items-center justify-center">
-            <h3 id="poem-title-display" class="text-2xl font-bold text-center text-yellow-400 mb-4"></h3>
-            <p id="poem-content" class="text-xl leading-relaxed text-gray-300 whitespace-pre-wrap text-center overflow-y-auto w-full max-h-[80%]"></p>
+        <!-- Poem Display Area - UPDATED -->
+        <div id="poem-display" class="mt-8 p-6 bg-blue-200 rounded-xl shadow-lg hidden aspect-video flex flex-col items-center justify-center">
+            <h3 id="poem-title-display" class="text-6xl font-bold text-center text-blue-800 mb-4"></h3>
+            <p id="poem-content" class="text-5xl leading-relaxed text-gray-800 whitespace-pre-wrap text-center overflow-y-auto w-full max-h-[80%]"></p>
         </div>
         
         <!-- Canvas ẩn để ghi hình -->
@@ -293,13 +293,13 @@
         let videoUrl = null;
         let animationFrameId = null; // Thêm biến để quản lý animation frame
         
-        // Ánh xạ màu sắc từ hex code sang Tailwind CSS class
+        // Ánh xạ màu sắc từ hex code sang Tailwind CSS class - UPDATED
         const colorMap = {
-            "#facc15": "text-yellow-400",
-            "#f87171": "text-red-400",
-            "#4ade80": "text-green-400",
-            "#60a5fa": "text-blue-400",
-            "#a78bfa": "text-purple-400"
+            "#facc15": "text-yellow-500",
+            "#f87171": "text-red-500",
+            "#4ade80": "text-green-500",
+            "#60a5fa": "text-blue-500",
+            "#a78bfa": "text-purple-500"
         };
         
         // LƯU Ý: HÃY DÁN CÁC MÃ API CỦA BẠN VÀO ĐÂY!
@@ -568,34 +568,33 @@
                     handleStop();
                 };
                 
-                // Function to draw text on the canvas
+                // Function to draw text on the canvas - UPDATED
                 const drawPoemOnCanvas = () => {
-                    // Clear the canvas
-                    context.fillStyle = '#1f2937'; // gray-800
+                    // Clear the canvas with light blue
+                    context.fillStyle = '#bfdbfe'; // Tailwind blue-200
                     context.fillRect(0, 0, canvas.width, canvas.height);
 
                     const titleText = poemTitleInput.value || "Nội dung của bạn";
                     const poemText = poemTextarea.value;
                     const selectedColor = colorSelect.value;
                     const padding = canvas.width * 0.05; // 5% padding
-                    const maxLineWidth = canvas.width - padding * 2;
                     const font = 'Inter, sans-serif';
 
                     // Draw Title
-                    context.font = `bold ${canvas.height * 0.04}px ${font}`;
-                    context.fillStyle = '#facc15'; // yellow-400
+                    context.font = `bold ${canvas.height * 0.12}px ${font}`; // Increased size
+                    context.fillStyle = '#1e40af'; // Tailwind blue-800
                     context.textAlign = 'center';
                     context.textBaseline = 'top';
                     const titleY = padding;
                     context.fillText(titleText, canvas.width / 2, titleY);
 
                     // Draw Poem
-                    const poemFontSize = canvas.height * 0.03;
+                    const poemFontSize = canvas.height * 0.09; // Increased size
                     const lineHeight = poemFontSize * 1.5;
                     context.font = `${poemFontSize}px ${font}`;
                     context.textAlign = 'left';
                     
-                    let y = titleY + canvas.height * 0.04 + lineHeight;
+                    let y = titleY + canvas.height * 0.12 + lineHeight;
                     let x = padding;
                     let globalWordIndex = 0;
                     
@@ -620,7 +619,7 @@
                         }
 
                         // Draw the word
-                        context.fillStyle = globalWordIndex === window.currentWordIndex ? selectedColor : '#d1d5db'; // gray-300
+                        context.fillStyle = globalWordIndex === window.currentWordIndex ? selectedColor : '#1f2937'; // Tailwind gray-800
                         context.fillText(token, x, y);
                         
                         x += wordWidth;
@@ -825,8 +824,3 @@
     </script>
 </body>
 </html>
-```
-
-Tôi đã thêm một màn hình modal yêu cầu mật khẩu. Nội dung chính của ứng dụng sẽ bị ẩn cho đến khi bạn nhập đúng mật khẩu.
-
-Hãy cho tôi biết nếu bạn cần điều chỉnh gì thêm n
