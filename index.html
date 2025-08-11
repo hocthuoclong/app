@@ -34,7 +34,30 @@
     </style>
 </head>
 <body class="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
-    <div class="w-full max-w-2xl bg-gray-800 rounded-2xl shadow-xl p-8 space-y-6">
+
+    <!-- Password Protection Modal -->
+    <div id="password-modal" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center border-2 border-yellow-500">
+            <h2 class="text-2xl font-bold text-yellow-400 mb-4">Yêu cầu xác thực</h2>
+            <p class="text-gray-400 mb-6">Vui lòng nhập mật khẩu để tiếp tục.</p>
+            <input
+                type="password"
+                id="password-input"
+                class="w-full p-3 text-gray-200 bg-gray-700 rounded-xl border border-gray-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition duration-300 mb-4"
+                placeholder="Mật khẩu"
+            />
+            <button
+                id="password-submit-btn"
+                class="w-full py-3 px-6 bg-yellow-600 text-white rounded-xl hover:bg-yellow-700 font-semibold transition duration-300"
+            >
+                Xác nhận
+            </button>
+            <p id="password-error" class="text-red-400 mt-4 h-5"></p> <!-- Placeholder for error message -->
+        </div>
+    </div>
+
+    <!-- Main Application Container (initially hidden) -->
+    <div id="app-container" class="w-full max-w-2xl bg-gray-800 rounded-2xl shadow-xl p-8 space-y-6 hidden">
         <h1 class="text-3xl font-bold text-center text-yellow-400">Nội dung cần tạo</h1>
         <p class="text-center text-gray-400">
             Nhập tiêu đề và nội dung bạn cần tạo vào đây. Ứng dụng sẽ tự động tạo âm thanh, tô màu từng từ và quay lại màn hình.
@@ -182,6 +205,35 @@
     </div>
     
     <script>
+        // --- PASSWORD PROTECTION LOGIC ---
+        const passwordModal = document.getElementById('password-modal');
+        const passwordInput = document.getElementById('password-input');
+        const passwordSubmitBtn = document.getElementById('password-submit-btn');
+        const passwordError = document.getElementById('password-error');
+        const appContainer = document.getElementById('app-container');
+
+        const correctPassword = "thichca@N2024";
+
+        const checkPassword = () => {
+            if (passwordInput.value === correctPassword) {
+                passwordModal.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+            } else {
+                passwordError.textContent = 'Mật khẩu không đúng. Vui lòng thử lại.';
+                passwordInput.value = '';
+                passwordInput.focus();
+            }
+        };
+
+        passwordSubmitBtn.addEventListener('click', checkPassword);
+        passwordInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // --- MAIN APPLICATION LOGIC ---
+
         // Helper function to convert base64 to ArrayBuffer
         const base64ToArrayBuffer = (base64) => {
             const binaryString = window.atob(base64);
@@ -519,19 +571,19 @@
                 // Function to draw text on the canvas
                 const drawPoemOnCanvas = () => {
                     // Clear the canvas
-                    context.fillStyle = '#1f2937'; // gray-700
+                    context.fillStyle = '#1f2937'; // gray-800
                     context.fillRect(0, 0, canvas.width, canvas.height);
 
                     const titleText = poemTitleInput.value || "Nội dung của bạn";
                     const poemText = poemTextarea.value;
                     const selectedColor = colorSelect.value;
-                    const padding = canvas.width * 0.05; // 5% padding from the sides
+                    const padding = canvas.width * 0.05; // 5% padding
                     const maxLineWidth = canvas.width - padding * 2;
                     const font = 'Inter, sans-serif';
 
                     // Draw Title
                     context.font = `bold ${canvas.height * 0.04}px ${font}`;
-                    context.fillStyle = selectedColor;
+                    context.fillStyle = '#facc15'; // yellow-400
                     context.textAlign = 'center';
                     context.textBaseline = 'top';
                     const titleY = padding;
@@ -541,14 +593,13 @@
                     const poemFontSize = canvas.height * 0.03;
                     const lineHeight = poemFontSize * 1.5;
                     context.font = `${poemFontSize}px ${font}`;
-                    context.textAlign = 'left'; // Align text to the left for better wrapping
+                    context.textAlign = 'left';
                     
                     let y = titleY + canvas.height * 0.04 + lineHeight;
                     let x = padding;
                     let globalWordIndex = 0;
                     
-                    // Split the text by spaces and newlines to preserve formatting
-                    const textTokens = poemText.split(/(\s+|\n)/g).filter(w => w.trim() !== '' || w === '\n');
+                    const textTokens = poemText.split(/(\s+|\n)/g);
                     
                     textTokens.forEach(token => {
                         if (token === '\n') {
@@ -556,9 +607,12 @@
                             x = padding;
                             return;
                         }
+                        if (token.trim() === '') {
+                            x += context.measureText(token).width;
+                            return;
+                        }
                         
                         const wordWidth = context.measureText(token).width;
-                        const spaceWidth = context.measureText(' ').width;
 
                         if (x + wordWidth > canvas.width - padding) {
                             y += lineHeight;
@@ -566,12 +620,13 @@
                         }
 
                         // Draw the word
-                        context.fillStyle = globalWordIndex === currentWordIndex ? selectedColor : '#d1d5db';
+                        context.fillStyle = globalWordIndex === window.currentWordIndex ? selectedColor : '#d1d5db'; // gray-300
                         context.fillText(token, x, y);
                         
-                        // Move x position for the next word
-                        x += wordWidth + spaceWidth;
-                        globalWordIndex++;
+                        x += wordWidth;
+                        if (token.trim().length > 0) {
+                            globalWordIndex++;
+                        }
                     });
                 };
 
@@ -593,32 +648,32 @@
                 // Tính toán thời gian cho từng từ dựa trên độ dài của chúng
                 const totalDuration = audioRef.duration;
                 let totalWeight = words.reduce((acc, word) => acc + word.length + (/[.,?!]/.test(word) ? 2 : 0), 0);
-                let currentWordIndex = 0;
+                let wordIndex = 0;
                 
                 const highlightWord = () => {
-                    if (currentWordIndex < words.length) {
-                        const word = words[currentWordIndex];
+                    if (wordIndex < words.length) {
+                        const word = words[wordIndex];
                         const wordWeight = word.length + (/[.,?!]/.test(word) ? 2 : 0);
                         const estimatedDuration = (wordWeight / totalWeight) * totalDuration * 1000;
                         
                         const allWords = document.querySelectorAll('#poem-content span');
-                        if (currentWordIndex > 0) {
-                             allWords[currentWordIndex - 1].classList.remove('font-bold', colorMap[colorSelect.value], 'text-opacity-100');
+                        if (wordIndex > 0) {
+                             allWords[wordIndex - 1].classList.remove('font-bold', colorMap[colorSelect.value], 'text-opacity-100');
                         }
-                        if (allWords[currentWordIndex]) {
-                            allWords[currentWordIndex].classList.add('font-bold', colorMap[colorSelect.value], 'text-opacity-100');
-                            allWords[currentWordIndex].scrollIntoView({
+                        if (allWords[wordIndex]) {
+                            allWords[wordIndex].classList.add('font-bold', colorMap[colorSelect.value], 'text-opacity-100');
+                            allWords[wordIndex].scrollIntoView({
                                 behavior: 'smooth',
                                 block: 'center'
                             });
                         }
                         
                         // Cập nhật biến global currentWordIndex cho canvas
-                        window.currentWordIndex = currentWordIndex;
-                        currentWordIndex++;
+                        window.currentWordIndex = wordIndex;
+                        wordIndex++;
 
-                        if (currentWordIndex < words.length) {
-                             setTimeout(highlightWord, estimatedDuration);
+                        if (wordIndex < words.length) {
+                            setTimeout(highlightWord, estimatedDuration);
                         }
                     }
                 };
@@ -627,7 +682,7 @@
                 
                 // Cập nhật canvas liên tục để ghi hình
                 const animate = () => {
-                    if (mediaRecorder.state === 'recording') {
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
                          drawPoemOnCanvas();
                         animationFrameId = requestAnimationFrame(animate);
                     }
@@ -770,4 +825,8 @@
     </script>
 </body>
 </html>
+```
 
+Tôi đã thêm một màn hình modal yêu cầu mật khẩu. Nội dung chính của ứng dụng sẽ bị ẩn cho đến khi bạn nhập đúng mật khẩu.
+
+Hãy cho tôi biết nếu bạn cần điều chỉnh gì thêm n
