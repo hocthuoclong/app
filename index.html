@@ -223,6 +223,12 @@
 
         const correctPassword = "thichca@N2024";
 
+        function initAudioContext() {
+            // This function is just a placeholder to ensure the user interacts with the page
+            // before we try to use AudioContext, which helps prevent issues.
+            console.log("Page interaction detected, AudioContext should be usable.");
+        }
+
         const checkPassword = () => {
             if (passwordInput.value === correctPassword) {
                 if (rememberMeCheckbox.checked) {
@@ -232,6 +238,7 @@
                 }
                 passwordModal.classList.add('hidden');
                 appContainer.classList.remove('hidden');
+                initAudioContext();
             } else {
                 passwordError.textContent = 'Mật khẩu không đúng. Vui lòng thử lại.';
                 passwordInput.value = '';
@@ -302,7 +309,7 @@
         
         let audioUrl = null;
         let audioRef = null;
-        let timeoutIds = [];
+        let timeoutId = null;
         let words = [];
         let currentWordIndex = -1;
 
@@ -310,9 +317,8 @@
         let mediaRecorder = null;
         let recordedChunks = [];
         let videoUrl = null;
-        let animationFrameId = null; // Thêm biến để quản lý animation frame
+        let animationFrameId = null;
         
-        // Ánh xạ màu sắc từ hex code sang Tailwind CSS class - UPDATED
         const colorMap = {
             "#facc15": "text-yellow-500",
             "#f87171": "text-red-500",
@@ -321,8 +327,6 @@
             "#a78bfa": "text-purple-500"
         };
         
-        // LƯU Ý: HÃY DÁN CÁC MÃ API CỦA BẠN VÀO ĐÂY!
-        // Tên tài khoản là key, giá trị là mã API.
         const apiKeys = {
             "Tài khoản 1-adida": "AIzaSyBPjVP0P3AmyGTy_NzH31XreJoKbfWu6Fw",
             "Tài khoản 2- htkd": "AIzaSyAbtF_xJ-9L6o2mlrltdicF2O3p3QfOEa4",
@@ -352,11 +356,10 @@
         const modalMessage = document.getElementById('modal-message');
         const modalCloseBtn = document.getElementById('modal-close-btn');
 
-        // Thêm các option vào dropdown khi trang được load
         document.addEventListener('DOMContentLoaded', () => {
-            // Check if password is remembered
             if (localStorage.getItem('passwordRemembered') === 'true') {
                 appContainer.classList.remove('hidden');
+                initAudioContext();
             } else {
                 passwordModal.classList.remove('hidden');
             }
@@ -369,22 +372,18 @@
             }
         });
 
-        // Show a custom modal message
         const showModal = (message) => {
             modalMessage.textContent = message;
             modal.classList.remove('hidden');
         };
 
-        // Event listeners cho các nút
         generateBtn.addEventListener('click', handleGenerateAudio);
         playBtn.addEventListener('click', handlePlay);
         stopBtn.addEventListener('click', handleStop);
         modalCloseBtn.addEventListener('click', () => modal.classList.add('hidden'));
         recordBtn.addEventListener('click', toggleRecording);
 
-        // API call cho text-to-speech
         async function handleGenerateAudio() {
-            // Thay đổi: Lấy API Key từ dropdown đã chọn
             const apiKey = apiKeySelect.value.trim();
             if (!apiKey || apiKey.startsWith("MÃ_API_CỦA_TÀI_KHOẢN")) {
                 showModal("Lỗi: Vui lòng chọn một API Key hợp lệ.");
@@ -398,7 +397,6 @@
                 return;
             }
             
-            // Cleanup previous state
             handleStop();
             if (audioUrl) {
                 URL.revokeObjectURL(audioUrl);
@@ -414,7 +412,6 @@
             downloadVideoBtn.classList.add('opacity-50', 'cursor-not-allowed', 'hidden');
             downloadVideoBtn.classList.remove('hover:bg-pink-700', 'hover:scale-105');
             
-            // Display title and content
             poemTitleDisplay.textContent = titleText || "Nội dung của bạn";
             words = poemText.split(/(\s+|[,.?!;:"'])+/).filter(word => word.trim() !== '');
             poemContent.innerHTML = words.map(word => `<span>${word} </span>`).join('');
@@ -478,7 +475,6 @@
                     audioUrl = URL.createObjectURL(wavBlob);
                     showModal("Tạo âm thanh thành công! Giờ bạn có thể nhấn Phát hoặc Quay màn hình.");
                     
-                    // Cập nhật giao diện nút
                     playBtn.disabled = false;
                     playBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     playBtn.classList.add('hover:bg-green-700', 'hover:scale-105');
@@ -498,72 +494,6 @@
                 generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 generateBtn.classList.add('hover:bg-yellow-700', 'hover:scale-105');
             }
-        }
-
-        /**
-         * --- IMPROVED TIMING AND HIGHLIGHTING LOGIC ---
-         * This new function avoids performance issues by using a sequential, recursive setTimeout 
-         * instead of scheduling all highlights at once. This prevents the browser from freezing on long texts.
-         * @param {number} totalDuration - The total duration of the audio in milliseconds.
-         * @param {function} onHighlight - Callback function to execute for each word highlight.
-         * @param {function} onEnd - Callback function to execute when all highlights are finished.
-         */
-        function scheduleHighlighting(totalDuration, onHighlight, onEnd) {
-            handleStop(); // Clear any previous timers before starting
-
-            const titleText = poemTitleInput.value;
-            const poemText = poemTextarea.value;
-            // Add extra newline for a more pronounced pause after the title
-            const fullText = `${titleText ? titleText + '\n\n' : ''}${poemText}`;
-            
-            // 1. Tokenize text into words and delimiters (punctuation, whitespace)
-            const tokens = fullText.split(/([,?!;:"'.\s\n]+)/).filter(Boolean);
-            
-            // 2. Assign a weight to each token to estimate its duration
-            const weightedTokens = tokens.map(token => {
-                let weight = 0;
-                if (/[.?!]/.test(token)) weight = 3.5;       // End of sentence pause
-                else if (/[;:]/.test(token)) weight = 2.5;   // Stronger pause
-                else if (/,/.test(token)) weight = 1.8;      // Comma pause
-                else if (/[\n]+/.test(token)) weight = 3.0 * token.length; // Newline pause
-                else if (/[\s]+/.test(token)) weight = 0.5 * token.length; // Whitespace pause
-                else weight = token.length;                  // Word length as base weight
-                return { token, weight };
-            });
-
-            const totalWeight = weightedTokens.reduce((sum, wt) => sum + wt.weight, 0);
-            if (totalWeight === 0) {
-                if (onEnd) onEnd();
-                return;
-            }
-
-            let wordSpanIndex = 0;
-            let tokenIndex = 0;
-
-            // 3. Process tokens sequentially using a recursive setTimeout chain
-            function processNextToken() {
-                if (tokenIndex >= weightedTokens.length) {
-                    if (onEnd) onEnd();
-                    return;
-                }
-
-                const { token, weight } = weightedTokens[tokenIndex];
-                const durationInMs = (weight / totalWeight) * totalDuration;
-
-                // If the token is a word, trigger the highlight callback
-                if (wordSpanIndex < words.length && token === words[wordSpanIndex]) {
-                    onHighlight(wordSpanIndex);
-                    wordSpanIndex++;
-                }
-                
-                tokenIndex++;
-
-                // Schedule the next token processing
-                const timeoutId = setTimeout(processNextToken, durationInMs);
-                timeoutIds.push(timeoutId);
-            }
-
-            processNextToken(); // Start the chain
         }
         
         async function startCombinedWorkflow() {
@@ -591,16 +521,27 @@
             canvas.width = width;
             canvas.height = height;
             const context = canvas.getContext('2d');
+            
+            // SCROLLING FIX: Initialize canvas scroll variables
+            let canvasScrollY = 0;
+            let targetCanvasScrollY = 0;
+            let currentWordCanvasY = 0;
 
             try {
                 audioRef = new Audio(audioUrl);
                 await new Promise((resolve) => { audioRef.onloadedmetadata = () => resolve(); });
+                
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
 
                 const videoStream = canvas.captureStream(30);
-                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 const audioSource = audioContext.createMediaElementSource(audioRef);
                 const destination = audioContext.createMediaStreamDestination();
+                
                 audioSource.connect(destination);
+                audioSource.connect(audioContext.destination);
 
                 const combinedStream = new MediaStream([
                     ...videoStream.getVideoTracks(),
@@ -631,8 +572,8 @@
                     handleStop();
                 };
                 
-                const drawPoemOnCanvas = () => {
-                    context.fillStyle = '#bfdbfe'; // Tailwind blue-200
+                const drawPoemOnCanvas = (scrollOffset) => {
+                    context.fillStyle = '#bfdbfe';
                     context.fillRect(0, 0, canvas.width, canvas.height);
 
                     const titleText = poemTitleInput.value || "Nội dung của bạn";
@@ -641,10 +582,10 @@
                     const font = 'Inter, sans-serif';
 
                     context.font = `bold ${canvas.height * 0.12}px ${font}`;
-                    context.fillStyle = '#1e40af'; // Tailwind blue-800
+                    context.fillStyle = '#1e40af';
                     context.textAlign = 'center';
                     context.textBaseline = 'top';
-                    context.fillText(titleText, canvas.width / 2, padding);
+                    context.fillText(titleText, canvas.width / 2, padding - scrollOffset);
 
                     const poemFontSize = canvas.height * 0.09;
                     const lineHeight = poemFontSize * 1.5;
@@ -661,46 +602,79 @@
                         if (token === '\n') { y += lineHeight; x = padding; return; }
                         if (token.trim() === '') { x += context.measureText(token).width; return; }
                         
+                        // SCROLLING FIX: Update the Y position of the current word
+                        if (globalWordIndex === window.currentWordIndex) {
+                            currentWordCanvasY = y;
+                        }
+
                         const wordWidth = context.measureText(token).width;
                         if (x + wordWidth > canvas.width - padding) { y += lineHeight; x = padding; }
 
                         context.fillStyle = globalWordIndex === window.currentWordIndex ? selectedColor : '#1f2937';
-                        context.fillText(token, x, y);
+                        context.fillText(token, x, y - scrollOffset);
                         
                         x += wordWidth;
                         if (token.trim().length > 0) globalWordIndex++;
                     });
                 };
+                
+                const allWordsSpans = document.querySelectorAll('#poem-content span');
+                const selectedColorClass = colorMap[colorSelect.value];
+                const totalDuration = audioRef.duration;
+                const totalWeight = words.reduce((acc, word) => acc + word.length + (/[.,?!]/.test(word) ? 2 : 0), 0);
+                let wordIndex = 0;
+
+                function highlightNextWord() {
+                    if (wordIndex < words.length) {
+                        const word = words[wordIndex];
+                        const wordWeight = word.length + (/[.,?!]/.test(word) ? 2 : 0);
+                        const estimatedDuration = (wordWeight / totalWeight) * totalDuration * 1000;
+
+                        if (currentWordIndex >= 0) {
+                            allWordsSpans[currentWordIndex].classList.remove('font-bold', selectedColorClass, 'text-opacity-100');
+                        }
+                        
+                        if (allWordsSpans[wordIndex]) {
+                            allWordsSpans[wordIndex].classList.add('font-bold', selectedColorClass, 'text-opacity-100');
+                        }
+                        
+                        window.currentWordIndex = wordIndex;
+                        currentWordIndex = wordIndex;
+                        wordIndex++;
+
+                        timeoutId = setTimeout(highlightNextWord, estimatedDuration);
+                    }
+                }
 
                 mediaRecorder.start();
                 audioRef.play();
+                highlightNextWord();
                 
                 recordBtn.textContent = 'Dừng quay';
                 recordBtn.disabled = false;
                 recordBtn.classList.remove('bg-purple-600', 'hover:bg-purple-700', 'opacity-50', 'cursor-not-allowed');
                 recordBtn.classList.add('bg-red-600', 'hover:bg-red-700');
                 
-                const allWordsSpans = document.querySelectorAll('#poem-content span');
-                const selectedColorClass = colorMap[colorSelect.value];
-
-                scheduleHighlighting(
-                    audioRef.duration * 1000,
-                    (wordIndex) => {
-                        window.currentWordIndex = wordIndex; // For canvas
-                        if (wordIndex > 0) allWordsSpans[wordIndex - 1]?.classList.remove('font-bold', selectedColorClass, 'text-opacity-100');
-                        allWordsSpans[wordIndex]?.classList.add('font-bold', selectedColorClass, 'text-opacity-100');
-                        allWordsSpans[wordIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    },
-                    () => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }
-                );
-                
                 const animate = () => {
                     if (mediaRecorder && mediaRecorder.state === 'recording') {
-                        drawPoemOnCanvas();
+                        // SCROLLING FIX: Smoothly adjust scroll position
+                        if (currentWordCanvasY > 0) {
+                            targetCanvasScrollY = currentWordCanvasY - (canvas.height / 2);
+                        }
+                        targetCanvasScrollY = Math.max(0, targetCanvasScrollY);
+                        canvasScrollY += (targetCanvasScrollY - canvasScrollY) * 0.08;
+
+                        drawPoemOnCanvas(canvasScrollY);
                         animationFrameId = requestAnimationFrame(animate);
                     }
                 };
                 animationFrameId = requestAnimationFrame(animate);
+                
+                audioRef.onended = () => {
+                    if (mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                };
 
             } catch (err) {
                 console.error("Lỗi khi quay màn hình:", err);
@@ -745,30 +719,49 @@
             const allWordsSpans = document.querySelectorAll('#poem-content span');
 
             audioRef.onloadedmetadata = () => {
-                scheduleHighlighting(
-                    audioRef.duration * 1000,
-                    (wordIndex) => { // onHighlight
-                        if (currentWordIndex >= 0) allWordsSpans[currentWordIndex]?.classList.remove('font-bold', selectedColorClass, 'text-opacity-100');
-                        allWordsSpans[wordIndex]?.classList.add('font-bold', selectedColorClass, 'text-opacity-100');
-                        allWordsSpans[wordIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const totalDuration = audioRef.duration;
+                const totalWeight = words.reduce((acc, word) => acc + word.length + (/[.,?!]/.test(word) ? 2 : 0), 0);
+                let wordIndex = 0;
+
+                function highlightNextWord() {
+                    if (wordIndex < words.length) {
+                        const word = words[wordIndex];
+                        const wordWeight = word.length + (/[.,?!]/.test(word) ? 2 : 0);
+                        const estimatedDuration = (wordWeight / totalWeight) * totalDuration * 1000;
+
+                        if (currentWordIndex >= 0) {
+                            allWordsSpans[currentWordIndex].classList.remove('font-bold', selectedColorClass, 'text-opacity-100');
+                        }
+                        
+                        if (allWordsSpans[wordIndex]) {
+                            allWordsSpans[wordIndex].classList.add('font-bold', selectedColorClass, 'text-opacity-100');
+                            allWordsSpans[wordIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        
                         currentWordIndex = wordIndex;
-                    },
-                    () => { // onEnd
-                        handleStop();
+                        wordIndex++;
+
+                        timeoutId = setTimeout(highlightNextWord, estimatedDuration);
                     }
-                );
+                }
+                highlightNextWord();
+            };
+
+            audioRef.onended = () => {
+                handleStop();
             };
         }
 
-        // Stop audio and reset state
         function handleStop() {
             if (audioRef) {
                 audioRef.pause();
                 audioRef.currentTime = 0;
                 audioRef = null;
             }
-            timeoutIds.forEach(id => clearTimeout(id));
-            timeoutIds = [];
+            if(timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
             
             playBtn.textContent = 'Phát';
             if (audioUrl) {
@@ -787,7 +780,7 @@
                 word.classList.remove('font-bold', selectedColorClass, 'text-opacity-100');
             });
             currentWordIndex = -1;
-            window.currentWordIndex = -1; // For canvas
+            window.currentWordIndex = -1;
         }
 
         window.addEventListener('beforeunload', () => {
