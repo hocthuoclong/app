@@ -416,7 +416,7 @@
             
             // Display title and content
             poemTitleDisplay.textContent = titleText || "Nội dung của bạn";
-            words = poemText.split(/(\s+|[,.?!])+/).filter(word => word.trim() !== '');
+            words = poemText.split(/(\s+|[,.?!;:"'])+/).filter(word => word.trim() !== '');
             poemContent.innerHTML = words.map(word => `<span>${word} </span>`).join('');
             if (words.length > 0 || titleText) {
                 poemDisplay.classList.remove('hidden');
@@ -500,54 +500,70 @@
             }
         }
 
-        // --- NEW TIMING AND HIGHLIGHTING LOGIC ---
+        /**
+         * --- IMPROVED TIMING AND HIGHLIGHTING LOGIC ---
+         * This new function avoids performance issues by using a sequential, recursive setTimeout 
+         * instead of scheduling all highlights at once. This prevents the browser from freezing on long texts.
+         * @param {number} totalDuration - The total duration of the audio in milliseconds.
+         * @param {function} onHighlight - Callback function to execute for each word highlight.
+         * @param {function} onEnd - Callback function to execute when all highlights are finished.
+         */
         function scheduleHighlighting(totalDuration, onHighlight, onEnd) {
+            handleStop(); // Clear any previous timers before starting
+
             const titleText = poemTitleInput.value;
             const poemText = poemTextarea.value;
-            const fullText = `${titleText ? titleText + '\n' : ''}${poemText}`;
+            // Add extra newline for a more pronounced pause after the title
+            const fullText = `${titleText ? titleText + '\n\n' : ''}${poemText}`;
             
-            const allWordsSpans = document.querySelectorAll('#poem-content span');
-
-            // 1. Tokenize text into words and delimiters
-            const tokens = fullText.split(/([,?!;:"'\s\n]+)/).filter(Boolean);
+            // 1. Tokenize text into words and delimiters (punctuation, whitespace)
+            const tokens = fullText.split(/([,?!;:"'.\s\n]+)/).filter(Boolean);
             
-            // 2. Assign a weight to each token
+            // 2. Assign a weight to each token to estimate its duration
             const weightedTokens = tokens.map(token => {
                 let weight = 0;
-                if (/[.,?!;:]/.test(token)) weight = 2.5; // Punctuation pause
-                else if (/[\s\n]+/.test(token)) weight = 0.6 * token.length; // Whitespace/newline pause
-                else weight = token.length; // Word length
+                if (/[.?!]/.test(token)) weight = 3.5;       // End of sentence pause
+                else if (/[;:]/.test(token)) weight = 2.5;   // Stronger pause
+                else if (/,/.test(token)) weight = 1.8;      // Comma pause
+                else if (/[\n]+/.test(token)) weight = 3.0 * token.length; // Newline pause
+                else if (/[\s]+/.test(token)) weight = 0.5 * token.length; // Whitespace pause
+                else weight = token.length;                  // Word length as base weight
                 return { token, weight };
             });
 
             const totalWeight = weightedTokens.reduce((sum, wt) => sum + wt.weight, 0);
             if (totalWeight === 0) {
-                if(onEnd) onEnd();
+                if (onEnd) onEnd();
                 return;
-            };
+            }
 
-            let cumulativeDelay = 0;
             let wordSpanIndex = 0;
+            let tokenIndex = 0;
 
-            // 3. Schedule highlighting based on cumulative delay
-            weightedTokens.forEach(({ token, weight }) => {
-                const duration = (weight / totalWeight) * totalDuration;
-                
-                // Check if the current token is a word that needs to be highlighted
+            // 3. Process tokens sequentially using a recursive setTimeout chain
+            function processNextToken() {
+                if (tokenIndex >= weightedTokens.length) {
+                    if (onEnd) onEnd();
+                    return;
+                }
+
+                const { token, weight } = weightedTokens[tokenIndex];
+                const durationInMs = (weight / totalWeight) * totalDuration;
+
+                // If the token is a word, trigger the highlight callback
                 if (wordSpanIndex < words.length && token === words[wordSpanIndex]) {
-                    const timeoutId = setTimeout(() => {
-                        onHighlight(wordSpanIndex);
-                    }, cumulativeDelay);
-                    timeoutIds.push(timeoutId);
+                    onHighlight(wordSpanIndex);
                     wordSpanIndex++;
                 }
                 
-                cumulativeDelay += duration;
-            });
+                tokenIndex++;
 
-            // Schedule the end event
-            const endTimeoutId = setTimeout(onEnd, totalDuration);
-            timeoutIds.push(endTimeoutId);
+                // Schedule the next token processing
+                const timeoutId = setTimeout(processNextToken, durationInMs);
+                timeoutIds.push(timeoutId);
+            }
+
+            processNextToken(); // Start the chain
         }
         
         async function startCombinedWorkflow() {
