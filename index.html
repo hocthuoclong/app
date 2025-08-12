@@ -42,13 +42,14 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5); /* Lớp phủ tối để làm nổi bật chữ */
+            background-color: rgba(0, 0, 0, 0.2); /* Lớp phủ tối SIÊU MỎNG */
             z-index: 1;
         }
         #poem-display > * {
             position: relative;
             z-index: 2;
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.7); /* Đổ bóng cho chữ */
+            /* Thay thế shadow bằng viền chữ sắc nét */
+            text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
         }
         
         /* --- STYLES FOR 2-LINE KARAOKE EFFECT --- */
@@ -138,8 +139,8 @@
             <textarea
                 id="end-screen-text"
                 class="w-full h-24 p-4 text-gray-200 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 transition duration-300"
-                placeholder="Cảm ơn đã xem video!&#10;Đăng ký kênh: https://www.youtube.com/@hocthuoclong2k"
-            ></textarea>
+            >Cảm ơn đã xem video!
+Đăng ký kênh: https://www.youtube.com/@hocthuoclong2k</textarea>
         </div>
         
         <!-- UPDATED: Audio Source Selection -->
@@ -928,20 +929,20 @@
                 let transitionStartTime = -1;
                 const TRANSITION_DURATION = 1.0; // 1 second
 
-                const drawPoemOnCanvas = (currentTime) => {
+                const drawPoemOnCanvas = (elapsedTime) => {
                     context.clearRect(0, 0, canvas.width, canvas.height);
                     
                     // Background and Transition Logic
-                    const newBgIndex = backgroundSlots.findIndex(bg => bg.file && currentTime >= bg.startTime && currentTime <= bg.endTime);
+                    const newBgIndex = backgroundSlots.findIndex(bg => bg.file && elapsedTime >= bg.startTime && elapsedTime <= bg.endTime);
                     if (newBgIndex !== currentBgIndex) {
                         previousBgIndex = currentBgIndex;
                         currentBgIndex = newBgIndex;
-                        transitionStartTime = currentTime;
+                        transitionStartTime = elapsedTime;
                     }
 
                     const currentBg = backgroundSlots[currentBgIndex];
                     const previousBg = backgroundSlots[previousBgIndex];
-                    const transitionProgress = Math.min(1.0, (currentTime - transitionStartTime) / TRANSITION_DURATION);
+                    const transitionProgress = Math.min(1.0, (elapsedTime - transitionStartTime) / TRANSITION_DURATION);
 
                     // Draw background
                     context.fillStyle = '#000000';
@@ -963,10 +964,10 @@
                         drawImageContain(context, currentBg.imageObject, alpha, scale, xOffset);
                     }
                     
-                    context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    context.fillStyle = 'rgba(0, 0, 0, 0.3)';
                     context.fillRect(0, 0, canvas.width, canvas.height);
 
-                    if (currentTime > totalDuration) {
+                    if (elapsedTime > totalDuration) {
                         const endScreenLines = endScreenTextarea.value.split('\n');
                         context.fillStyle = '#FFFFFF';
                         context.textAlign = 'center';
@@ -979,6 +980,7 @@
                             if (index > 0) {
                                 context.font = `${canvas.height * 0.04}px 'Inter', sans-serif`;
                             }
+                            context.strokeText(line, canvas.width / 2, startY + (index * 70));
                             context.fillText(line, canvas.width / 2, startY + (index * 70));
                         });
                         return;
@@ -1007,14 +1009,15 @@
                     const y1 = y2 - lineHeight;
                     const titleY = y1 - (lineHeight * 0.5);
                     
-                    context.shadowColor = "black";
-                    context.shadowBlur = 10;
+                    context.strokeStyle = 'black';
+                    context.lineWidth = 4;
                     context.textBaseline = 'bottom';
                     context.textAlign = 'center';
 
-                    if (currentTime * 1000 < titleDuration) {
+                    if (elapsedTime * 1000 < titleDuration) {
                         context.font = `bold ${canvas.height * 0.10}px ${font}`;
                         context.fillStyle = '#FFFFFF';
+                        context.strokeText(titleText, canvas.width / 2, titleY);
                         context.fillText(titleText, canvas.width / 2, titleY);
                     }
                     
@@ -1029,6 +1032,7 @@
                             if (selectedColor === 'none') isHighlighted = false;
                             
                             context.fillStyle = isHighlighted ? selectedColor : '#FFFFFF';
+                            context.strokeText(word, currentX, y1);
                             context.fillText(word, currentX, y1);
                             currentX += context.measureText(word).width;
                             if (/\S/.test(word)) wordCounter++;
@@ -1036,6 +1040,7 @@
                     }
                     if (line2) {
                         context.fillStyle = '#FFFFFF';
+                        context.strokeText(line2.text, canvas.width / 2, y2);
                         context.fillText(line2.text, canvas.width / 2, y2);
                     }
                 };
@@ -1075,9 +1080,8 @@
                         const elapsedTime = (performance.now() - recordingStartTime) / 1000;
                         const remainingTime = Math.max(0, totalDuration + 10 - elapsedTime);
                         recordCountdown.textContent = `(${remainingTime.toFixed(1)}s)`;
-
-                        const currentTime = audioSourceTextRadio.checked ? audioRef.currentTime : audioContext.currentTime;
-                        drawPoemOnCanvas(currentTime);
+                        
+                        drawPoemOnCanvas(elapsedTime);
                         animationFrameId = requestAnimationFrame(animate);
                     }
                 };
